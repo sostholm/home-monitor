@@ -1,0 +1,45 @@
+version: "3.8"
+services:
+  loki:
+    image: grafana/loki
+    ports:
+      - 3100:3100
+    volumes:
+      - loki:/loki
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - /home/samson/projects/monitor/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus:/prometheus
+  promtail:
+    image: grafana/promtail:latest
+    volumes:
+      - /var/log/:/var/lib/dockerhost/logs
+      - /home/samson/projects/monitor/promtail-docker-config.yml:/etc/promtail/promtail-docker-config.yml
+    command: -config.file=/etc/promtail/promtail-docker-config.yml
+  grafana:
+    image: grafana/grafana
+    ports:
+      - 3000:3000
+    secrets:
+      - key
+      - cert
+    environment:
+      - GF_SERVER_CERT_FILE=/run/secrets/cert
+      - GF_SERVER_CERT_KEY=/run/secrets/key
+      - GF_SERVER_PROTOCOL=https
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource,fifemon-graphql-datasource
+    volumes:
+      - grafana:/var/lib/grafana
+volumes:
+    prometheus:
+    loki:
+    grafana:
+secrets:
+    key:
+        external: true
+    cert:
+        external: true
+
