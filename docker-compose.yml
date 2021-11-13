@@ -6,40 +6,78 @@ services:
       - 3100:3100
     volumes:
       - loki:/loki
+    deploy:
+      placement:
+        constraints:
+          - node.hostname==server
   prometheus:
     image: prom/prometheus
     ports:
       - 9090:9090
     volumes:
-      - /home/samson/projects/monitor/prometheus.yml:/etc/prometheus/prometheus.yml
+      - /home/samson/projects/home-monitor/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus:/prometheus
-  promtail:
-    image: grafana/promtail:latest
-    volumes:
-      - /var/log/:/var/lib/dockerhost/logs
-      - /home/samson/projects/monitor/promtail-docker-config.yml:/etc/promtail/promtail-docker-config.yml
-    command: -config.file=/etc/promtail/promtail-docker-config.yml
-  grafana:
+    deploy:
+      placement:
+        constraints:
+          - node.hostname==server
+  # promtail:
+  #   image: grafana/promtail:latest
+  #   volumes:
+  #     - /var/log/:/var/lib/dockerhost/logs
+  #     - /home/samson/projects/monitor/promtail-docker-config.yml:/etc/promtail/promtail-docker-config.yml
+  #   command: -config.file=/etc/promtail/promtail-docker-config.yml
+  grafana-service:
     image: grafana/grafana
     ports:
       - 3000:3000
     secrets:
-      - key
-      - cert
+      - pine64key
+      - pine64cert
     environment:
-      - GF_SERVER_CERT_FILE=/run/secrets/cert
-      - GF_SERVER_CERT_KEY=/run/secrets/key
+      - GF_SERVER_CERT_FILE=/run/secrets/pine64cert
+      - GF_SERVER_CERT_KEY=/run/secrets/pine64key
       - GF_SERVER_PROTOCOL=https
       - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource,fifemon-graphql-datasource
     volumes:
       - grafana:/var/lib/grafana
+    # networks:
+    #   - monitor_default
+    deploy:
+      placement:
+        constraints:
+          - node.hostname==pine64
+
+  proxy:
+    image: grafana_proxy
+    build: .
+    ports:
+        - 443:443
+    volumes:
+        - "/home/samson/secrets:/app/secrets"
+    networks:
+      - swarm-macvlan
+      - monitor_default
+    deploy:
+      placement:
+        constraints:
+          - node.hostname==pine64
+    # logging:
+    #     driver: loki
+    #     options:
+    #         loki-url: "http://localhost:3100/loki/api/v1/push"
 volumes:
     prometheus:
     loki:
     grafana:
 secrets:
-    key:
+    pine64key:
         external: true
-    cert:
+    pine64cert:
         external: true
 
+networks:
+  swarm-macvlan:
+    external: true
+  monitor_default:
+    external: true
